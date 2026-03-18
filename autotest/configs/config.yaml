@@ -1,0 +1,12 @@
+ env: local
+ 
+ api:
+   base_url: "https://example.invalid"  # 示例；API 用例里使用 mock，不依赖网络
+   timeout: 10
+ 
+ ui:
+   base_url: "https://example.com"
+   browser: "chromium"
+   headless: true
+   timeout_ms: 15000
+ 
