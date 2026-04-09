@@ -16,12 +16,47 @@ from __future__ import annotations
 """
 
 import json as _json
+import time
 from typing import Any
 
 import responses
 
 from ..core.jsonpath import get_path
+from ..core.merge_dict import deep_merge
 from .context import KeywordContext, KeywordFunc
+
+
+def _build_json_from_template(ctx: KeywordContext, template_name: str, patch: dict[str, Any]) -> dict[str, Any]:
+    if template_name not in ctx.templates:
+        known = sorted(ctx.templates)
+        hint = f" Known keys: {known}" if known else " No templates loaded (check data/payload_templates/)."
+        raise KeyError(f"Unknown json_template {template_name!r}.{hint}")
+    base = ctx.templates[template_name]
+    if not isinstance(base, dict):
+        raise TypeError(f"Template {template_name!r} must be a mapping, got {type(base)}")
+    return deep_merge(base, patch)
+
+
+def _resolve_api_json_body(ctx: KeywordContext, args: dict[str, Any]) -> Any:
+    """
+    支持三种方式（互斥）：
+    - 仅 ``json``：与原来一致
+    - ``json_template`` + 可选 ``json_patch``：从 ctx.templates 取底稿再合并补丁（补丁里可用 ``${}``）
+    """
+
+    has_json_key = "json" in args
+    has_template = args.get("json_template") is not None
+    if has_json_key and has_template:
+        raise ValueError("api_post args: use either json or json_template, not both")
+    if has_template:
+        name = str(args["json_template"])
+        patch = args.get("json_patch") or {}
+        if not isinstance(patch, dict):
+            raise TypeError("json_patch must be a dict")
+        return _build_json_from_template(ctx, name, patch)
+    if has_json_key:
+        return args["json"]
+    return None
 
 
 def kw_api_mock_get(ctx: KeywordContext, args: dict[str, Any]) -> None:
@@ -60,6 +95,61 @@ def kw_api_get(ctx: KeywordContext, args: dict[str, Any]) -> Any:
     return ctx.http.get(url)
 
 
+def kw_api_post(ctx: KeywordContext, args: dict[str, Any]) -> Any:
+    """
+    关键字：发起 POST（JSON body），返回 `ApiResponse`。
+
+    大 body 可放到 ``data/payload_templates/`` 中，此处用 ``json_template`` + ``json_patch`` 只写差异字段。
+    """
+
+    url = str(args["url"])
+    body = _resolve_api_json_body(ctx, args)
+    return ctx.http.post(url, json=body)
+
+
+def kw_json_from_template(ctx: KeywordContext, args: dict[str, Any]) -> dict[str, Any]:
+    """
+    关键字：从模板合并出 dict，供后续步骤 ``save_as`` 后传给 ``api_post`` 的 ``json: "${body}"``。
+
+    args: ``template``（名），可选 ``patch``（与 json_patch 语义相同）
+    """
+
+    name = str(args["template"])
+    patch = args.get("patch") or {}
+    if not isinstance(patch, dict):
+        raise TypeError("patch must be a dict")
+    return _build_json_from_template(ctx, name, patch)
+
+def kw_api_put(ctx: KeywordContext, args: dict[str, Any]) -> Any:
+    """关键字：发起 PUT（JSON body），返回 `ApiResponse`。"""
+
+    url = str(args["url"])
+    body = args.get("json")
+    return ctx.http.post(url, json=body)
+
+def kw_api_delete(ctx: KeywordContext, args: dict[str, Any]) -> Any:
+    """关键字：发起 DELETE（JSON body），返回 `ApiResponse`。"""
+
+    url = str(args["url"])
+    body = args.get("json")
+    return ctx.http.post(url, json=body)
+
+
+def kw_assert_equals(ctx: KeywordContext, args: dict[str, Any]) -> None:
+    """关键字：断言两个值相等（`actual` / `expected` 会先经过变量解析）。"""
+
+    actual = args["actual"]
+    expected = args["expected"]
+    assert actual == expected, f"assert_equals failed: actual={actual!r} expected={expected!r}"
+
+
+def kw_unix_timestamp(ctx: KeywordContext, args: dict[str, Any]) -> int:
+    """关键字：返回当前 Unix 时间戳（秒，整数），用于拼唯一用户名等。"""
+
+    _ = ctx, args
+    return int(time.time())
+
+
 def kw_assert_json_path(ctx: KeywordContext, args: dict[str, Any]) -> None:
     """
     关键字：断言 JSON 中某个 path 的值（极简版 jsonpath）。
@@ -85,6 +175,10 @@ def default_registry() -> dict[str, KeywordFunc]:
     return {
         "api_mock_get": kw_api_mock_get,
         "api_get": kw_api_get,
+        "api_post": kw_api_post,
+        "json_from_template": kw_json_from_template,
+        "assert_equals": kw_assert_equals,
+        "unix_timestamp": kw_unix_timestamp,
         "assert_json_path": kw_assert_json_path,
     }
 

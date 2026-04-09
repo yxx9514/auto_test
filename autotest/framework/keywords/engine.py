@@ -24,6 +24,9 @@ from __future__ import annotations
 1) YAML 里每一步都有一个 `keyword`（关键字名字）
 2) Python 里有一个同名函数去执行这个动作（在 `ctx.registry` 里注册）
 3) 上一步的结果可以用 `save_as` 存起来，下一步用 `${变量名}` 取出来
+
+大请求体可放在 ``data/payload_templates/*.yaml``，在 ``api_post`` 的 args 里用 ``json_template`` +
+``json_patch``（补丁里同样支持 ``${}``）；与 ``json`` 二选一。也可用关键字 ``json_from_template`` 生成 body 再 ``save_as``。
 """
 
 import re

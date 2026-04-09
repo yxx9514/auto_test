@@ -1,0 +1,10 @@
+# 在 autotest 目录下执行：pip install -r requirements.txt
+# 或：pip install -e .
+
+pytest>=8.0.0
+allure-pytest>=2.13.0
+allure-python-commons>=2.13.0
+PyYAML>=6.0.1
+requests>=2.31.0
+responses>=0.25.0
+loguru>=0.7.2

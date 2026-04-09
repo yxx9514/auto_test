@@ -1,0 +1,675 @@
+openapi: 3.0.3
+info:
+  title: 测试平台后台 API
+  description: |
+    Flask 测试平台 REST 接口（阶段 1）。
+
+    **认证说明**：除 `GET /api/v1/ping` 与 `POST /api/v1/auth/login` 外，其余接口需在登录后携带 **会话 Cookie**（Flask 默认名为 `session`）。
+
+    **Postman 使用**：先调用「登录」，在 Postman 中开启 **Send cookies** / 使用同一域名与端口，后续请求会自动带上 Cookie；或在登录响应中复制 `Set-Cookie` 手动添加到请求 Cookie。
+
+    默认种子账号：`admin` / `admin123`。
+  version: "1.0.0"
+
+servers:
+  - url: http://127.0.0.1:5000
+    description: 本地默认（run.py 端口）
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Roles
+  - name: Cases
+
+paths:
+  /api/v1/ping:
+    get:
+      tags: [Health]
+      summary: 健康检查
+      description: 无需登录。
+      operationId: ping
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  service: { type: string, example: test-platform }
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 登录
+      description: 成功后设置会话 Cookie，后续请求需携带。
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              default:
+                value:
+                  username: admin
+                  password: admin123
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: 登出
+      security:
+        - cookieAuth: []
+      operationId: authLogout
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: 当前登录用户
+      security:
+        - cookieAuth: []
+      operationId: authMe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserPublic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: 用户列表
+      security:
+        - cookieAuth: []
+      operationId: listUsers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserPublic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Users]
+      summary: 创建用户
+      security:
+        - cookieAuth: []
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserPublic"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: 用户名已存在等冲突
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/users/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [Users]
+      summary: 用户详情
+      security:
+        - cookieAuth: []
+      operationId: getUser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserPublic"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Users]
+      summary: 更新用户（密码、角色）
+      security:
+        - cookieAuth: []
+      operationId: patchUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchUserRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserPublic"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Users]
+      summary: 删除用户（不可删除当前登录用户）
+      security:
+        - cookieAuth: []
+      operationId: deleteUser
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/roles:
+    get:
+      tags: [Roles]
+      summary: 角色列表
+      security:
+        - cookieAuth: []
+      operationId: listRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  roles:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Role"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Roles]
+      summary: 创建角色
+      security:
+        - cookieAuth: []
+      operationId: createRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  role:
+                    $ref: "#/components/schemas/Role"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: 角色名称已存在
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorBody"
+
+  /api/v1/roles/{role_id}:
+    parameters:
+      - $ref: "#/components/parameters/RoleId"
+    delete:
+      tags: [Roles]
+      summary: 删除角色
+      security:
+        - cookieAuth: []
+      operationId: deleteRole
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/cases:
+    get:
+      tags: [Cases]
+      summary: 用例列表
+      security:
+        - cookieAuth: []
+      operationId: listCases
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cases:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TestCase"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Cases]
+      summary: 创建用例
+      security:
+        - cookieAuth: []
+      operationId: createCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCaseRequest"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  case:
+                    $ref: "#/components/schemas/TestCase"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/cases/{case_id}:
+    parameters:
+      - $ref: "#/components/parameters/CaseId"
+    get:
+      tags: [Cases]
+      summary: 用例详情
+      security:
+        - cookieAuth: []
+      operationId: getCase
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  case:
+                    $ref: "#/components/schemas/TestCase"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Cases]
+      summary: 更新用例（部分字段）
+      security:
+        - cookieAuth: []
+      operationId: patchCase
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchCaseRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  case:
+                    $ref: "#/components/schemas/TestCase"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Cases]
+      summary: 删除用例
+      security:
+        - cookieAuth: []
+      operationId: deleteCase
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Flask 会话 Cookie（登录接口返回 Set-Cookie）
+
+  parameters:
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      description: 用户 id，1～999999（最多 6 位整数）
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 999999
+        example: 1
+    RoleId:
+      name: role_id
+      in: path
+      required: true
+      description: 角色 id（字符串，如 role_admin）
+      schema:
+        type: string
+        example: role_admin
+    CaseId:
+      name: case_id
+      in: path
+      required: true
+      description: 用例 id，1～999999（最多 6 位整数）
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 999999
+        example: 1
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    Unauthorized:
+      description: 未登录或会话无效
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorBody"
+
+  schemas:
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: string
+          example: invalid_request
+        message:
+          type: string
+          example: 说明信息
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        user:
+          $ref: "#/components/schemas/UserPublic"
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+          example: role_admin
+        name:
+          type: string
+          example: admin
+        kind:
+          type: string
+          enum: [system, business]
+
+    UserPublic:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 用户数字 id（1～999999）
+          example: 1
+        username:
+          type: string
+        role_ids:
+          type: array
+          items:
+            type: string
+        roles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+
+    CreateUserRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role_ids:
+          type: array
+          items:
+            type: string
+          description: 可选，角色 id 列表
+
+    PatchUserRequest:
+      type: object
+      description: 至少提供 password 或 role_ids 之一
+      properties:
+        password:
+          type: string
+        role_ids:
+          type: array
+          items:
+            type: string
+
+    CreateRoleRequest:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [system, business]
+
+    TestCase:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: 用例数字 id（1～999999）
+        name:
+          type: string
+        module:
+          type: string
+        level:
+          type: string
+        pre_steps:
+          type: string
+        steps:
+          type: string
+        expected_result:
+          type: string
+        actual_result:
+          type: string
+          nullable: true
+        executor:
+          type: string
+          nullable: true
+        executed_at:
+          type: string
+          nullable: true
+          description: ISO8601 时间字符串，未执行可为 null
+
+    CreateCaseRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        module:
+          type: string
+        level:
+          type: string
+        pre_steps:
+          type: string
+        steps:
+          type: string
+        expected_result:
+          type: string
+        actual_result:
+          type: string
+          nullable: true
+        executor:
+          type: string
+          nullable: true
+        executed_at:
+          type: string
+          nullable: true
+          description: ISO8601，如 2026-04-05T12:30:00；未执行请不传或 null。勿填占位符字符串。
+
+    PatchCaseRequest:
+      type: object
+      description: 仅传需要更新的字段
+      properties:
+        name:
+          type: string
+        module:
+          type: string
+        level:
+          type: string
+        pre_steps:
+          type: string
+        steps:
+          type: string
+        expected_result:
+          type: string
+        actual_result:
+          nullable: true
+        executor:
+          nullable: true
+        executed_at:
+          nullable: true
+          description: ISO8601；无效字符串将返回 400

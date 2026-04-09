@@ -7,6 +7,7 @@
  dependencies = [
    "pytest>=8.0.0",
    "allure-pytest>=2.13.0",
+   "allure-python-commons>=2.13.0",
    "PyYAML>=6.0.1",
    "requests>=2.31.0",
    "responses>=0.25.0",
@@ -26,6 +27,7 @@
    "api: API tests",
    "ui: UI tests",
    "keyword: keyword-driven tests",
+   "test_platform: 需本地启动 test_platform 服务的关键字联调用例",
  ]
 
 [build-system]

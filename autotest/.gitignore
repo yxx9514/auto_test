@@ -9,16 +9,18 @@ build/
 
 # venv
 venv/
-autotest/.venv/
+.venv/
 
 # IDE
 .idea/
 .vscode/
 
-# pytest / allure
+# pytest / allure（规则相对本文件所在目录 autotest/）
 .pytest_cache/
-autotest/allure-results/
-autotest/logs/
+allure-results/
+**/allure-results/
+logs/
+**/logs/
 
 # misc
 .DS_Store

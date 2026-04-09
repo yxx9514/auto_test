@@ -1,0 +1,16 @@
+# 对接本地 Flask 测试平台（test_platform）时使用。
+# 运行前请先启动：cd test_platform && python run.py
+# 执行用例示例：
+#   pytest tests/keyword/test_test_platform_keyword_cases.py -v
+
+env: local
+
+api:
+  base_url: "http://127.0.0.1:5000"
+  timeout: 15
+
+ui:
+  base_url: "https://example.com"
+  browser: "chromium"
+  headless: true
+  timeout_ms: 15000

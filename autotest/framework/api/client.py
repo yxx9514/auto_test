@@ -70,3 +70,11 @@ class HttpClient:
         r = self.session.post(self._url(url), json=json, timeout=self.timeout, **kwargs)
         return ApiResponse(r.status_code, dict(r.headers), r.text)
 
+    def delete(self, url: str, json: Any | None = None, **kwargs: Any) -> ApiResponse:
+        r = self.session.post(self._url(url), json=json, timeout=self.timeout, **kwargs)
+        return ApiResponse(r.status_code, dict(r.headers), r.text)
+
+    def put(self, url: str, json: Any | None = None, **kwargs: Any) -> ApiResponse:
+        r = self.session.post(self._url(url), json=json, timeout=self.timeout, **kwargs)
+        return ApiResponse(r.status_code, dict(r.headers), r.text)
+

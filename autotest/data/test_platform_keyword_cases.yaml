@@ -1,0 +1,188 @@
+# 测试平台关键字用例：真实 HTTP，依赖 test_platform 已启动 + 种子账号 admin/admin123
+#
+# 大段 JSON 见 data/payload_templates/test_platform.yaml；此处用 json_template + json_patch 只写差异。
+#
+# 「新增用户」覆盖说明：
+# - 成功：登录 → POST /users → 201 + 字段断言
+# - 未登录：直接 POST /users → 401
+# - 重名：同一 case 内连续两次相同 username → 第二次 409
+# - 非法角色：role_ids 含不存在 id → 400
+# - 缺必填：无 password → 400
+
+cases:
+  # ---------- 正向：登录后成功创建用户 ----------
+  - name: "测试平台: 新增用户-登录后创建成功"
+    steps:
+      - keyword: unix_timestamp
+        save_as: ts
+
+      - keyword: api_post
+        args:
+          url: "/api/v1/auth/login"
+          json_template: auth_login_admin
+        save_as: login_resp
+
+      - keyword: assert_equals
+        args:
+          actual: "${login_resp.status_code}"
+          expected: 200
+
+      - keyword: assert_json_path
+        args:
+          data_ref: "${login_resp.json}"
+          path: "ok"
+          expected: true
+
+      - keyword: api_post
+        args:
+          url: "/api/v1/users"
+          json_template: user_create_with_qa_role
+          json_patch:
+            username: "kw_user_${ts}"
+        save_as: create_resp
+
+      - keyword: assert_equals
+        args:
+          actual: "${create_resp.status_code}"
+          expected: 201
+
+      - keyword: assert_json_path
+        args:
+          data_ref: "${create_resp.json}"
+          path: "user.username"
+          expected: "kw_user_${ts}"
+
+      - keyword: assert_json_path
+        args:
+          data_ref: "${create_resp.json}"
+          path: "user.role_ids.0"
+          expected: "role_qa"
+
+  # ---------- 未登录：受保护接口应 401 ----------
+  - name: "测试平台: 新增用户-未登录返回401"
+    steps:
+      - keyword: unix_timestamp
+        save_as: ts
+      # 本 case 单独一条测试函数，keyword_ctx_live 会新建 Session，无 Cookie
+      - keyword: api_post
+        args:
+          url: "/api/v1/users"
+          json_template: user_create_no_roles
+          json_patch:
+            username: "kw_noauth_${ts}"
+        save_as: resp
+      - keyword: assert_equals
+        args:
+          actual: "${resp.status_code}"
+          expected: 401
+      - keyword: assert_json_path
+        args:
+          data_ref: "${resp.json}"
+          path: "error"
+          expected: "unauthorized"
+
+  # ---------- 重名：第二次创建同用户名 409 ----------
+  - name: "测试平台: 新增用户-用户名重复返回409"
+    steps:
+      - keyword: unix_timestamp
+        save_as: ts
+      - keyword: api_post
+        args:
+          url: "/api/v1/auth/login"
+          json_template: auth_login_admin
+        save_as: login_resp
+      - keyword: assert_equals
+        args:
+          actual: "${login_resp.status_code}"
+          expected: 200
+      - keyword: api_post
+        args:
+          url: "/api/v1/users"
+          json_template: user_create_with_qa_role
+          json_patch:
+            username: "kw_dup_${ts}"
+            password: "PwFirst1"
+        save_as: first_create
+      - keyword: assert_equals
+        args:
+          actual: "${first_create.status_code}"
+          expected: 201
+      - keyword: api_post
+        args:
+          url: "/api/v1/users"
+          json_template: user_create_with_qa_role
+          json_patch:
+            username: "kw_dup_${ts}"
+            password: "PwSecond2"
+        save_as: second_create
+      - keyword: assert_equals
+        args:
+          actual: "${second_create.status_code}"
+          expected: 409
+      - keyword: assert_json_path
+        args:
+          data_ref: "${second_create.json}"
+          path: "error"
+          expected: "conflict"
+
+  # ---------- 非法角色 id ----------
+  - name: "测试平台: 新增用户-角色不存在返回400"
+    steps:
+      - keyword: unix_timestamp
+        save_as: ts
+      - keyword: api_post
+        args:
+          url: "/api/v1/auth/login"
+          json_template: auth_login_admin
+        save_as: login_resp
+      - keyword: assert_equals
+        args:
+          actual: "${login_resp.status_code}"
+          expected: 200
+      - keyword: api_post
+        args:
+          url: "/api/v1/users"
+          json_template: user_create_bad_role
+          json_patch:
+            username: "kw_badrole_${ts}"
+        save_as: bad
+      - keyword: assert_equals
+        args:
+          actual: "${bad.status_code}"
+          expected: 400
+      - keyword: assert_json_path
+        args:
+          data_ref: "${bad.json}"
+          path: "error"
+          expected: "invalid_role"
+
+  # ---------- 缺少必填字段 ----------
+  - name: "测试平台: 新增用户-缺少密码返回400"
+    steps:
+      - keyword: unix_timestamp
+        save_as: ts
+      - keyword: api_post
+        args:
+          url: "/api/v1/auth/login"
+          json_template: auth_login_admin
+        save_as: login_resp
+      - keyword: assert_equals
+        args:
+          actual: "${login_resp.status_code}"
+          expected: 200
+      - keyword: api_post
+        args:
+          url: "/api/v1/users"
+          json_template: user_create_username_only
+          json_patch:
+            username: "kw_nopwd_${ts}"
+        save_as: nopwd
+      - keyword: assert_equals
+        args:
+          actual: "${nopwd.status_code}"
+          expected: 400
+      - keyword: assert_json_path
+        args:
+          data_ref: "${nopwd.json}"
+          path: "error"
+          expected: "invalid_request"

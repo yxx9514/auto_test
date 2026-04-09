@@ -1,0 +1,26 @@
+# 测试平台 API 请求体模板：用例 YAML 里用 json_template + json_patch 引用，避免几百字段堆在 case 里。
+# 可按业务再拆文件（同目录多 yaml 会合并；同名 key 后加载文件覆盖先加载的）。
+
+auth_login_admin:
+  username: admin
+  password: admin123
+
+# 创建用户：默认带 QA 角色；用例里 json_patch 只写 username / password 等差异字段
+user_create_with_qa_role:
+  password: KwTest@001
+  role_ids:
+    - role_qa
+
+# 未登录场景：无角色
+user_create_no_roles:
+  password: AnyPw1
+  role_ids: []
+
+# 非法角色（整段写在模板里，case 只 patch username）
+user_create_bad_role:
+  password: Pw1
+  role_ids:
+    - role_nonexistent_xyz
+
+# 缺密码：仅用户名，由 json_patch 提供 username
+user_create_username_only: {}
